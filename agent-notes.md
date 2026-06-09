@@ -1,4 +1,4 @@
-# Agent Notes
+ㄱㄱ# Agent Notes
 
 이 파일은 Codex 작업 메모다.
 사용자 요청, 구현 결정, 보류 중인 정보, 다음 작업 후보를 기록한다.
@@ -23,8 +23,9 @@
 
 - 인증 API 구현 완료: signup, login, refresh, logout.
 - 온보딩 입력 API 구현 완료: study profile, active exam plan, subject scopes.
+- 플랜 생성 job MVP 구현 완료: 동기 생성 + job 상태 조회 방식.
 - 플랜 도메인 엔티티는 존재함: daily plan, daily plan item, completion event.
-- 오늘 플랜, 대시보드, 기록, 플랜 생성 job API는 아직 미구현.
+- 오늘 플랜, 대시보드, 기록 API는 아직 미구현.
 
 ## Spec Gaps To Resolve
 
@@ -37,13 +38,13 @@
 - 플랜 생성 AI의 정확한 Anthropic API 연동 방식.
 - 프롬프트 입력 스키마.
 - 모델 응답 JSON shape.
-- 플랜 생성 job을 실제 비동기로 처리할지, 우선 동기 생성 후 job 상태만 흉내 낼지.
+- 플랜 생성 job을 실제 비동기로 바꿀 시점과 방식.
 - 완료 체크 해제 시 새싹 회수 정책.
 
 ## Next Candidate Work
 
-1. `api-spec.md`와 현재 온보딩 API 구조를 정리한다.
-2. `plan-generation-jobs` MVP를 만든다.
-3. 생성 결과로 `DailyPlan`, `DailyPlanItem`을 저장한다.
-4. `GET /plans/today`와 `GET /plans/today/progress`를 만든다.
-5. 항목 체크, 완료 처리, 기록 조회, 대시보드 API로 확장한다.
+1. `api-spec.md`와 현재 온보딩/plan-generation API 구조를 정리한다.
+2. `GET /plans/today`와 `GET /plans/today/progress`를 만든다.
+3. `PUT /plans/today`, `PATCH /plans/today/items/{planItemId}`, `POST /plans/today/complete`를 만든다.
+4. `GET /dashboard`, `GET /plans/history`, `GET /plans/history/{date}`로 확장한다.
+5. 이후 Anthropic Haiku provider 분리 지점을 설계한다.
