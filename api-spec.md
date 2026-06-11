@@ -218,8 +218,13 @@ Response `200 OK`
     "email": "minji@example.com",
     "age": 18,
     "schoolLevel": "HIGH_SCHOOL",
+    "targetExamType": "CSAT",
+    "targetExamLabel": "수능",
+    "examDate": "2026-06-12",
     "usualStudyHoursPerDay": 4,
     "preferredStudyMethod": "BALANCED",
+    "sproutCount": 12,
+    "attendanceStreakDays": 7,
     "onboardingCompleted": true
   }
 }
@@ -251,8 +256,13 @@ Response `200 OK`
     "email": "minji@example.com",
     "age": 18,
     "schoolLevel": "HIGH_SCHOOL",
+    "targetExamType": null,
+    "targetExamLabel": null,
+    "examDate": null,
     "usualStudyHoursPerDay": 4,
     "preferredStudyMethod": "BALANCED",
+    "sproutCount": 0,
+    "attendanceStreakDays": 0,
     "onboardingCompleted": false
   }
 }
@@ -314,7 +324,7 @@ Response `202 Accepted`
   "data": {
     "jobId": "plan-job-01JX123ABC",
     "status": "PENDING",
-    "estimatedSeconds": 8
+    "estimatedSeconds": 0
   }
 }
 ```
@@ -348,6 +358,21 @@ Response `200 OK` - 완료
     "planDate": "2026-06-04",
     "planId": 101,
     "dashboardAvailable": true
+  }
+}
+```
+
+Response `200 OK` - 실패
+
+```json
+{
+  "success": true,
+  "data": {
+    "jobId": "plan-job-01JX123ABC",
+    "status": "FAILED",
+    "progressPercent": 100,
+    "message": "수학 과목 범위를 먼저 입력해주세요.",
+    "dashboardAvailable": false
   }
 }
 ```
@@ -527,8 +552,8 @@ Response `200 OK`
 규칙
 
 - `false -> true` 전환일 때만 새싹 1개 지급
-- `true -> false` 전환 시 새싹 회수 여부는 정책 결정 필요
-  현재 초안은 회수하지 않음
+- `true -> false` 전환 시 새싹 1개 회수
+- 응답의 `sproutAwarded`는 변화량을 의미하며 `1`, `0`, `-1`이 될 수 있음
 
 ### 10.4 오늘 플랜 완료 처리
 

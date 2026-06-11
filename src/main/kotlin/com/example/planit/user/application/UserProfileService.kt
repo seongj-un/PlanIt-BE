@@ -2,6 +2,10 @@ package com.example.planit.user.application
 
 import com.example.planit.auth.security.AuthenticatedUser
 import com.example.planit.common.api.CommonApiException
+import com.example.planit.exam.domain.ExamPlanRepository
+import com.example.planit.exam.domain.ExamPlanStatus
+import com.example.planit.plan.application.TodayPlanService
+import com.example.planit.plan.domain.CompletionEventRepository
 import com.example.planit.user.api.AccountSettingsRequest
 import com.example.planit.user.api.NotificationSettingsRequest
 import com.example.planit.user.api.StudyProfileRequest
@@ -28,6 +32,9 @@ class UserProfileService(
     private val studyProfileRepository: StudyProfileRepository,
     private val notificationSettingsRepository: NotificationSettingsRepository,
     private val passwordEncoder: PasswordEncoder,
+    private val examPlanRepository: ExamPlanRepository,
+    private val completionEventRepository: CompletionEventRepository,
+    private val todayPlanService: TodayPlanService,
 ) {
 
     @Transactional(readOnly = true)
@@ -36,6 +43,9 @@ class UserProfileService(
             .orElseThrow { CommonApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다.") }
         val studyProfile = studyProfileRepository.findByUserId(user.id!!)
             .orElse(null)
+        val activePlan = examPlanRepository.findByUserIdAndStatus(user.id!!, ExamPlanStatus.ACTIVE)
+            .orElse(null)
+        val sproutCount = completionEventRepository.findAllByDailyPlanItemDailyPlanExamPlanUserId(user.id!!).sumOf { it.sproutDelta }
 
         return UserProfileResponse(
             id = user.id!!,
@@ -43,8 +53,13 @@ class UserProfileService(
             email = user.email,
             age = studyProfile?.age,
             schoolLevel = studyProfile?.schoolLevel?.name,
+            targetExamType = activePlan?.targetExamType?.name,
+            targetExamLabel = activePlan?.targetExamLabel,
+            examDate = activePlan?.examDate,
             usualStudyHoursPerDay = studyProfile?.usualStudyHoursPerDay,
             preferredStudyMethod = studyProfile?.preferredStudyMethod?.name,
+            sproutCount = sproutCount,
+            attendanceStreakDays = todayPlanService.streakDays(user.id!!),
             onboardingCompleted = user.onboardingCompleted,
         )
     }
@@ -75,17 +90,8 @@ class UserProfileService(
         profile.usualStudyHoursPerDay = request.usualStudyHoursPerDay
         profile.preferredStudyMethod = preferredStudyMethod
 
-        val saved = studyProfileRepository.save(profile)
-        return UserProfileResponse(
-            id = user.id!!,
-            name = user.name,
-            email = user.email,
-            age = saved.age,
-            schoolLevel = saved.schoolLevel.name,
-            usualStudyHoursPerDay = saved.usualStudyHoursPerDay,
-            preferredStudyMethod = saved.preferredStudyMethod.name,
-            onboardingCompleted = user.onboardingCompleted,
-        )
+        studyProfileRepository.save(profile)
+        return getMyProfile(principal)
     }
 
     @Transactional

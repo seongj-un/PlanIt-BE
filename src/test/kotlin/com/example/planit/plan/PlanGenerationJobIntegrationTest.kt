@@ -1,8 +1,9 @@
 package com.example.planit.plan
 
+import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.example.planit.plan.domain.DailyPlanItemRepository
 import com.example.planit.plan.domain.DailyPlanRepository
-import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -35,28 +36,7 @@ class PlanGenerationJobIntegrationTest(
         val createResponse = mockMvc.post("/api/v1/plan-generation-jobs") {
             header("Authorization", "Bearer $authToken")
             contentType = MediaType.APPLICATION_JSON
-            content =
-                """
-                {
-                  "subjects": [
-                    {
-                      "subjectName": "수학",
-                      "examRange": "수열과 극한 1~3단원",
-                      "preferredMethodNote": "개념 정리 후 대표 문제 15문제",
-                      "difficulty": "HIGH"
-                    },
-                    {
-                      "subjectName": "영어",
-                      "examRange": "빈칸 추론 10문제",
-                      "preferredMethodNote": "근거 문장 표시",
-                      "difficulty": "MEDIUM"
-                    }
-                  ],
-                  "preferredStudyMethod": "BALANCED",
-                  "difficultSubjects": ["수학"],
-                  "dailyMaxStudyHours": 5
-                }
-                """.trimIndent()
+            content = validGenerationRequest()
         }.andExpect {
             status { isAccepted() }
         }.andReturn().response.contentAsString
@@ -66,13 +46,7 @@ class PlanGenerationJobIntegrationTest(
         assertThat(createJson["data"]["status"].asText()).isEqualTo("PENDING")
         assertThat(createJson["data"]["estimatedSeconds"].asInt()).isEqualTo(0)
 
-        val statusResponse = mockMvc.get("/api/v1/plan-generation-jobs/$jobId") {
-            header("Authorization", "Bearer $authToken")
-        }.andExpect {
-            status { isOk() }
-        }.andReturn().response.contentAsString
-
-        val statusJson = objectMapper.readTree(statusResponse)
+        val statusJson = awaitJobCompleted(authToken, jobId)
         val planId = statusJson["data"]["planId"].asLong()
         assertThat(statusJson["data"]["status"].asText()).isEqualTo("COMPLETED")
         assertThat(statusJson["data"]["dashboardAvailable"].asBoolean()).isTrue()
@@ -127,13 +101,14 @@ class PlanGenerationJobIntegrationTest(
         upsertActivePlan(authToken)
         replaceSubjectScopes(authToken)
 
-        mockMvc.post("/api/v1/plan-generation-jobs") {
+        val firstCreateResponse = mockMvc.post("/api/v1/plan-generation-jobs") {
             header("Authorization", "Bearer $authToken")
             contentType = MediaType.APPLICATION_JSON
             content = validGenerationRequest()
         }.andExpect {
             status { isAccepted() }
-        }
+        }.andReturn().response.contentAsString
+        awaitJobCompleted(authToken, objectMapper.readTree(firstCreateResponse)["data"]["jobId"].asText())
 
         val todayPlanResponse = mockMvc.get("/api/v1/plans/today") {
             header("Authorization", "Bearer $authToken")
@@ -158,13 +133,14 @@ class PlanGenerationJobIntegrationTest(
         }.andReturn().response.contentAsString
         assertThat(objectMapper.readTree(progressBeforeRegeneration)["data"]["sproutCount"].asInt()).isEqualTo(1)
 
-        mockMvc.post("/api/v1/plan-generation-jobs") {
+        val secondCreateResponse = mockMvc.post("/api/v1/plan-generation-jobs") {
             header("Authorization", "Bearer $authToken")
             contentType = MediaType.APPLICATION_JSON
             content = validGenerationRequest()
         }.andExpect {
             status { isAccepted() }
-        }
+        }.andReturn().response.contentAsString
+        awaitJobCompleted(authToken, objectMapper.readTree(secondCreateResponse)["data"]["jobId"].asText())
 
         val progressAfterRegeneration = mockMvc.get("/api/v1/plans/today/progress") {
             header("Authorization", "Bearer $authToken")
@@ -175,6 +151,25 @@ class PlanGenerationJobIntegrationTest(
         val progressJson = objectMapper.readTree(progressAfterRegeneration)
         assertThat(progressJson["data"]["completedCount"].asInt()).isZero()
         assertThat(progressJson["data"]["sproutCount"].asInt()).isZero()
+    }
+
+    private fun awaitJobCompleted(authToken: String, jobId: String): JsonNode {
+        repeat(40) {
+            val response = mockMvc.get("/api/v1/plan-generation-jobs/$jobId") {
+                header("Authorization", "Bearer $authToken")
+            }.andExpect {
+                status { isOk() }
+            }.andReturn().response.contentAsString
+
+            val json = objectMapper.readTree(response)
+            when (json["data"]["status"].asText()) {
+                "COMPLETED" -> return json
+                "FAILED" -> error("plan generation job failed: ${json["data"]["message"].asText()}")
+            }
+            Thread.sleep(50)
+        }
+
+        error("plan generation job did not complete in time: $jobId")
     }
 
     private fun signupAndGetAccessToken(email: String): String {

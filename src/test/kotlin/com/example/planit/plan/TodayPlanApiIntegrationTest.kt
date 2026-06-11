@@ -120,7 +120,7 @@ class TodayPlanApiIntegrationTest(
 
         val uncheckMathJson = objectMapper.readTree(uncheckMathResponse)
         assertThat(uncheckMathJson["data"]["completed"].asBoolean()).isFalse()
-        assertThat(uncheckMathJson["data"]["sproutAwarded"].asInt()).isZero()
+        assertThat(uncheckMathJson["data"]["sproutAwarded"].asInt()).isEqualTo(-1)
         assertThat(uncheckMathJson["data"]["completedCount"].asInt()).isZero()
 
         mockMvc.patch("/api/v1/plans/today/items/${refreshedMathItem["planItemId"].asLong()}") {
@@ -200,7 +200,7 @@ class TodayPlanApiIntegrationTest(
     }
 
     @Test
-    fun `rechecking completed item does not mint extra sprouts`() {
+    fun `rechecking after revocation restores one sprout`() {
         val authToken = createGeneratedTodayPlan("today-plan-recheck@example.com")
 
         val todayPlanResponse = mockMvc.get("/api/v1/plans/today") {
@@ -236,7 +236,7 @@ class TodayPlanApiIntegrationTest(
         }.andReturn().response.contentAsString
 
         val recheckJson = objectMapper.readTree(recheckResponse)
-        assertThat(recheckJson["data"]["sproutAwarded"].asInt()).isZero()
+        assertThat(recheckJson["data"]["sproutAwarded"].asInt()).isEqualTo(1)
 
         val progressResponse = mockMvc.get("/api/v1/plans/today/progress") {
             header("Authorization", "Bearer $authToken")
@@ -345,7 +345,7 @@ class TodayPlanApiIntegrationTest(
     }
 
     private fun generateTodayPlan(authToken: String) {
-        mockMvc.post("/api/v1/plan-generation-jobs") {
+        val createResponse = mockMvc.post("/api/v1/plan-generation-jobs") {
             header("Authorization", "Bearer $authToken")
             contentType = MediaType.APPLICATION_JSON
             content =
@@ -372,7 +372,28 @@ class TodayPlanApiIntegrationTest(
                 """.trimIndent()
         }.andExpect {
             status { isAccepted() }
+        }.andReturn().response.contentAsString
+
+        awaitJobCompleted(authToken, objectMapper.readTree(createResponse)["data"]["jobId"].asText())
+    }
+
+    private fun awaitJobCompleted(authToken: String, jobId: String) {
+        repeat(40) {
+            val response = mockMvc.get("/api/v1/plan-generation-jobs/$jobId") {
+                header("Authorization", "Bearer $authToken")
+            }.andExpect {
+                status { isOk() }
+            }.andReturn().response.contentAsString
+
+            val json = objectMapper.readTree(response)
+            when (json["data"]["status"].asText()) {
+                "COMPLETED" -> return
+                "FAILED" -> error("plan generation job failed: ${json["data"]["message"].asText()}")
+            }
+            Thread.sleep(50)
         }
+
+        error("plan generation job did not complete in time: $jobId")
     }
 
     private fun JsonNode.first(predicate: (JsonNode) -> Boolean): JsonNode =

@@ -115,11 +115,12 @@ class TodayPlanService(
 
         val targetStatus = if (request.completed) PlanItemStatus.COMPLETED else PlanItemStatus.PENDING
         var sproutAwarded = 0
+        val currentSproutBalance = completionEventRepository.findAllByDailyPlanItemId(item.id!!).sumOf { it.sproutDelta }
 
         if (item.status != targetStatus) {
             if (item.status == PlanItemStatus.PENDING && targetStatus == PlanItemStatus.COMPLETED) {
                 item.status = PlanItemStatus.COMPLETED
-                if (!completionEventRepository.existsByDailyPlanItemId(item.id!!)) {
+                if (currentSproutBalance <= 0) {
                     completionEventRepository.save(
                         CompletionEvent(
                             dailyPlanItem = item,
@@ -132,6 +133,16 @@ class TodayPlanService(
             } else if (item.status == PlanItemStatus.COMPLETED && targetStatus == PlanItemStatus.PENDING) {
                 item.status = PlanItemStatus.PENDING
                 item.dailyPlan.status = DailyPlanStatus.PENDING
+                if (currentSproutBalance > 0) {
+                    completionEventRepository.save(
+                        CompletionEvent(
+                            dailyPlanItem = item,
+                            eventType = CompletionEventType.ITEM_UNCHECKED,
+                            sproutDelta = -1,
+                        ),
+                    )
+                    sproutAwarded = -1
+                }
             }
         }
 

@@ -46,6 +46,8 @@ class OnboardingSourceApiIntegrationTest(
         }.andReturn().response.contentAsString
         val profileJson = objectMapper.readTree(profilePayload)
         assertThat(profileJson["data"]["schoolLevel"].asText()).isEqualTo("HIGH_SCHOOL")
+        assertThat(profileJson["data"]["sproutCount"].asInt()).isZero()
+        assertThat(profileJson["data"]["attendanceStreakDays"].asInt()).isZero()
         assertThat(profileJson["data"]["onboardingCompleted"].asBoolean()).isFalse()
 
         mockMvc.put("/api/v1/exam-plans/active") {
@@ -118,6 +120,9 @@ class OnboardingSourceApiIntegrationTest(
             status { isOk() }
         }.andReturn().response.contentAsString
         val completedOnboardingJson = objectMapper.readTree(completedOnboardingPayload)
+        assertThat(completedOnboardingJson["data"]["targetExamType"].asText()).isEqualTo("CSAT")
+        assertThat(completedOnboardingJson["data"]["targetExamLabel"].asText()).isEqualTo("수능")
+        assertThat(completedOnboardingJson["data"]["examDate"].asText()).isEqualTo("2099-06-12")
         assertThat(completedOnboardingJson["data"]["onboardingCompleted"].asBoolean()).isTrue()
     }
 

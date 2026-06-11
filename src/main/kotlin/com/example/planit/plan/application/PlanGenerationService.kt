@@ -5,41 +5,29 @@ import com.example.planit.common.api.CommonApiException
 import com.example.planit.exam.domain.DifficultyLevel
 import com.example.planit.exam.domain.ExamPlanStatus
 import com.example.planit.exam.domain.ExamPlanRepository
-import com.example.planit.exam.domain.SubjectScope
 import com.example.planit.exam.domain.SubjectScopeRepository
 import com.example.planit.plan.api.PlanGenerationJobCreateRequest
 import com.example.planit.plan.api.PlanGenerationJobCreateResponse
 import com.example.planit.plan.api.PlanGenerationJobStatusResponse
 import com.example.planit.plan.api.PlanGenerationSubjectRequest
-import com.example.planit.plan.domain.DailyPlan
-import com.example.planit.plan.domain.DailyPlanItem
-import com.example.planit.plan.domain.DailyPlanItemRepository
-import com.example.planit.plan.domain.DailyPlanRepository
-import com.example.planit.plan.domain.DailyPlanStatus
-import com.example.planit.plan.domain.CompletionEventRepository
 import com.example.planit.plan.domain.PlanGenerationJob
 import com.example.planit.plan.domain.PlanGenerationJobRepository
 import com.example.planit.plan.domain.PlanGenerationJobStatus
-import com.example.planit.plan.domain.PlanItemPriority
-import com.example.planit.plan.domain.PlanItemStatus
 import com.example.planit.user.domain.UserAccountRepository
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.LocalDate
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.UUID
-import kotlin.math.max
-import kotlin.math.min
 
 @Service
 class PlanGenerationService(
     private val userAccountRepository: UserAccountRepository,
     private val examPlanRepository: ExamPlanRepository,
     private val subjectScopeRepository: SubjectScopeRepository,
-    private val dailyPlanRepository: DailyPlanRepository,
-    private val dailyPlanItemRepository: DailyPlanItemRepository,
-    private val completionEventRepository: CompletionEventRepository,
     private val planGenerationJobRepository: PlanGenerationJobRepository,
+    private val planGenerationJobProcessor: PlanGenerationJobProcessor,
 ) {
 
     @Transactional
@@ -55,6 +43,7 @@ class PlanGenerationService(
             .orElseThrow {
                 CommonApiException(HttpStatus.CONFLICT, "ACTIVE_PLAN_REQUIRED", "활성 시험 계획을 먼저 입력해주세요.")
             }
+        prevalidateSubjectScopes(activePlan.id!!, request.subjects)
 
         val job = planGenerationJobRepository.save(
             PlanGenerationJob(
@@ -66,91 +55,13 @@ class PlanGenerationService(
             ),
         )
 
-        val scopesBySubject = subjectScopeRepository.findAllByExamPlanId(activePlan.id!!)
-            .filter { it.remainingUnits > 0 }
-            .sortedBy { it.id }
-            .groupBy { normalize(it.subjectName) }
-            .mapValues { (_, scopes) -> scopes.toMutableList() }
-
-        val matchedSubjects = request.subjects.map { subject ->
-            val key = normalize(subject.subjectName)
-            val candidates = scopesBySubject[key]
-                ?: throw CommonApiException(
-                    HttpStatus.CONFLICT,
-                    "SUBJECT_SCOPE_NOT_FOUND",
-                    "${subject.subjectName.trim()} 과목 범위를 먼저 입력해주세요.",
-                )
-
-            if (candidates.isEmpty()) {
-                throw CommonApiException(
-                    HttpStatus.CONFLICT,
-                    "SUBJECT_SCOPE_NOT_FOUND",
-                    "${subject.subjectName.trim()} 과목 범위를 먼저 입력해주세요.",
-                )
-            }
-
-            MatchedSubject(subject = subject, scope = candidates.removeAt(0), difficulty = parseDifficulty(subject.difficulty))
-        }
-
-        val planDate = LocalDate.now()
-        val dailyPlan = dailyPlanRepository.findByExamPlanIdAndPlanDate(activePlan.id!!, planDate)
-            .orElseGet {
-                DailyPlan(
-                    examPlan = activePlan,
-                    planDate = planDate,
-                    status = DailyPlanStatus.PENDING,
-                )
-        }
-        dailyPlan.status = DailyPlanStatus.PENDING
-        val savedPlan = dailyPlanRepository.save(dailyPlan)
-
-        completionEventRepository.deleteAllByDailyPlanItemDailyPlanId(savedPlan.id!!)
-        dailyPlanItemRepository.deleteAllByDailyPlanId(savedPlan.id!!)
-
-        val difficultSubjects = request.difficultSubjects.map { normalize(it) }.toSet()
-        val totalMinutes = request.dailyMaxStudyHours * 60
-        val totalWeight = matchedSubjects.sumOf { weightOf(it.difficulty, difficultSubjects.contains(normalize(it.subject.subjectName))) }
-        var allocatedMinutes = 0
-
-        matchedSubjects.forEachIndexed { index, matched ->
-            val itemWeight = weightOf(matched.difficulty, difficultSubjects.contains(normalize(matched.subject.subjectName)))
-            val estimatedMinutes = if (index == matchedSubjects.lastIndex) {
-                max(1, totalMinutes - allocatedMinutes)
-            } else {
-                max(1, totalMinutes * itemWeight / totalWeight)
-            }
-            allocatedMinutes += estimatedMinutes
-
-            val remainingUnits = matched.scope.remainingUnits
-            if (remainingUnits <= 0) {
-                throw CommonApiException(
-                    HttpStatus.CONFLICT,
-                    "SUBJECT_SCOPE_EXHAUSTED",
-                    "${matched.subject.subjectName.trim()} 과목에 남은 범위가 없습니다.",
-                )
-            }
-
-            dailyPlanItemRepository.save(
-                DailyPlanItem(
-                    dailyPlan = savedPlan,
-                    subjectScope = matched.scope,
-                    subjectNameSnapshot = matched.subject.subjectName.trim(),
-                    rangeTextSnapshot = matched.subject.examRange.trim(),
-                    studyMethodSnapshot = matched.subject.preferredMethodNote.trim(),
-                    priority = priorityOf(matched.difficulty),
-                    status = PlanItemStatus.PENDING,
-                    plannedUnits = min(remainingUnits, max(1, estimatedMinutes / 60)),
-                    estimatedMinutes = estimatedMinutes,
-                    manuallyAdjusted = false,
-                ),
-            )
-        }
-
-        job.status = PlanGenerationJobStatus.COMPLETED
-        job.progressPercent = 100
-        job.message = "오늘 플랜 생성을 완료했어요."
-        job.planDate = planDate
-        job.generatedPlanId = savedPlan.id
+        TransactionSynchronizationManager.registerSynchronization(
+            object : TransactionSynchronization {
+                override fun afterCommit() {
+                    planGenerationJobProcessor.processRequested(job.id!!, principal.id, request)
+                }
+            },
+        )
 
         return PlanGenerationJobCreateResponse(
             jobId = job.jobId,
@@ -207,6 +118,31 @@ class PlanGenerationService(
         }
     }
 
+    private fun prevalidateSubjectScopes(examPlanId: Long, subjects: List<PlanGenerationSubjectRequest>) {
+        val scopesBySubject = subjectScopeRepository.findAllByExamPlanId(examPlanId)
+            .filter { it.remainingUnits > 0 }
+            .sortedBy { it.id }
+            .groupBy { normalize(it.subjectName) }
+            .mapValues { (_, scopes) -> scopes.toMutableList() }
+
+        subjects.forEach { subject ->
+            val candidates = scopesBySubject[normalize(subject.subjectName)]
+                ?: throw CommonApiException(
+                    HttpStatus.CONFLICT,
+                    "SUBJECT_SCOPE_NOT_FOUND",
+                    "${subject.subjectName.trim()} 과목 범위를 먼저 입력해주세요.",
+                )
+            if (candidates.isEmpty()) {
+                throw CommonApiException(
+                    HttpStatus.CONFLICT,
+                    "SUBJECT_SCOPE_NOT_FOUND",
+                    "${subject.subjectName.trim()} 과목 범위를 먼저 입력해주세요.",
+                )
+            }
+            candidates.removeAt(0)
+        }
+    }
+
     private fun generateJobId(): String =
         "plan-job-${UUID.randomUUID().toString().replace("-", "").take(12)}"
 
@@ -216,25 +152,5 @@ class PlanGenerationService(
                 throw CommonApiException(HttpStatus.BAD_REQUEST, "INVALID_DIFFICULTY", "유효하지 않은 난이도입니다.")
             }
 
-    private fun weightOf(difficulty: DifficultyLevel, difficultSubject: Boolean): Int =
-        when (difficulty) {
-            DifficultyLevel.HIGH -> 3
-            DifficultyLevel.MEDIUM -> 2
-            DifficultyLevel.LOW -> 1
-        } + if (difficultSubject) 1 else 0
-
-    private fun priorityOf(difficulty: DifficultyLevel): PlanItemPriority =
-        when (difficulty) {
-            DifficultyLevel.HIGH -> PlanItemPriority.HIGH
-            DifficultyLevel.MEDIUM -> PlanItemPriority.MEDIUM
-            DifficultyLevel.LOW -> PlanItemPriority.LOW
-        }
-
     private fun normalize(value: String): String = value.trim().lowercase()
-
-    private data class MatchedSubject(
-        val subject: PlanGenerationSubjectRequest,
-        val scope: SubjectScope,
-        val difficulty: DifficultyLevel,
-    )
 }
