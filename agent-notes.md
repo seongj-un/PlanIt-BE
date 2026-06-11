@@ -27,14 +27,15 @@
 - 오늘 플랜 API 구현 완료: 조회, 일괄 수정, 체크/체크 해제, 완료 처리, 진행도 조회.
 - 대시보드 API 구현 완료.
 - 기록 API 구현 완료: 월별 기록, 특정 날짜 상세.
+- 마이페이지 설정 API 구현 완료: study-settings, notification-settings, account.
 - 플랜 도메인 엔티티와 집계 이벤트는 현재 API 흐름에 연결됨.
 - 회귀 수정 반영 완료: 플랜 재생성 시 stale completion event 정리, today plan update blank validation, dashboard scopeSummary 정합성, 재체크 보상 중복 지급 방지.
 
 ## Spec Gaps To Resolve
 
-- `api-spec.md`의 `PUT /users/me/study-profile` 설명은 현재 구현과 다르다.
+- `api-spec.md`의 일부 설명은 현재 구현과 다르다.
 - 실제 구현은 프로필 입력과 시험 계획 입력이 분리되어 있다.
-- 이후 기능 추가 전 명세와 현재 API 구조를 한번 맞추는 편이 안전하다.
+- 이번 배치에서 사용자 설정 API는 맞췄고, 남은 명세 정리는 `GET /users/me` 요약 정보 범위 정도다.
 
 ## Pending Decisions
 
@@ -47,7 +48,7 @@
 
 ## Next Candidate Work
 
-1. `api-spec.md`를 현재 구현 구조에 맞게 정리한다.
-2. `PATCH /users/me/study-settings`와 `PATCH /users/me/notification-settings` 필요 여부를 확정한다.
-3. 플랜 생성 로직에서 Anthropic Haiku provider 분리 지점을 설계한다.
-4. 동기식 `plan-generation-jobs`를 실제 비동기 처리로 전환할 시점을 정한다.
+1. `GET /users/me` 응답 범위를 명세와 동일하게 확장할지, 문서를 현재 구현 기준으로 고정할지 결정한다.
+2. 플랜 생성 로직에서 Anthropic Haiku provider 분리 지점을 설계한다.
+3. 동기식 `plan-generation-jobs`를 실제 비동기 처리로 전환할 시점을 정한다.
+4. 완료 체크 해제 시 새싹 회수 정책을 확정한다.

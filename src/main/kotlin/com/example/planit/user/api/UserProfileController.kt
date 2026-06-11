@@ -5,6 +5,7 @@ import com.example.planit.auth.security.AuthenticatedUser
 import com.example.planit.user.application.UserProfileService
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -26,4 +27,25 @@ class UserProfileController(
         @RequestBody request: StudyProfileRequest,
     ): ApiSuccessResponse<UserProfileResponse> =
         ApiSuccessResponse(data = userProfileService.upsertStudyProfile(principal, request))
+
+    @PatchMapping("/study-settings")
+    fun updateStudySettings(
+        @AuthenticationPrincipal principal: AuthenticatedUser,
+        @RequestBody request: StudySettingsRequest,
+    ): ApiSuccessResponse<UpdatedResponse> =
+        ApiSuccessResponse(data = userProfileService.updateStudySettings(principal, request))
+
+    @PatchMapping("/notification-settings")
+    fun updateNotificationSettings(
+        @AuthenticationPrincipal principal: AuthenticatedUser,
+        @RequestBody request: NotificationSettingsRequest,
+    ): ApiSuccessResponse<UpdatedResponse> =
+        ApiSuccessResponse(data = userProfileService.updateNotificationSettings(principal, request))
+
+    @PatchMapping("/account")
+    fun updateAccount(
+        @AuthenticationPrincipal principal: AuthenticatedUser,
+        @RequestBody request: AccountSettingsRequest,
+    ): ApiSuccessResponse<UpdatedResponse> =
+        ApiSuccessResponse(data = userProfileService.updateAccount(principal, request))
 }

@@ -218,13 +218,9 @@ Response `200 OK`
     "email": "minji@example.com",
     "age": 18,
     "schoolLevel": "HIGH_SCHOOL",
-    "targetExamType": "CSAT",
-    "targetExamLabel": "수능",
-    "examDate": "2026-06-12",
     "usualStudyHoursPerDay": 4,
     "preferredStudyMethod": "BALANCED",
-    "sproutCount": 12,
-    "attendanceStreakDays": 7
+    "onboardingCompleted": true
   }
 }
 ```
@@ -239,9 +235,6 @@ Request
 {
   "age": 18,
   "schoolLevel": "HIGH_SCHOOL",
-  "targetExamType": "CSAT",
-  "targetExamLabel": "수능",
-  "examDate": "2026-06-12",
   "usualStudyHoursPerDay": 4,
   "preferredStudyMethod": "BALANCED"
 }
@@ -253,11 +246,22 @@ Response `200 OK`
 {
   "success": true,
   "data": {
-    "saved": true,
-    "onboardingStep": "PRE_STUDY_SURVEY"
+    "id": 1,
+    "name": "김민지",
+    "email": "minji@example.com",
+    "age": 18,
+    "schoolLevel": "HIGH_SCHOOL",
+    "usualStudyHoursPerDay": 4,
+    "preferredStudyMethod": "BALANCED",
+    "onboardingCompleted": false
   }
 }
 ```
+
+시험 계획과 시험 범위 입력은 별도 API로 분리되어 있다.
+
+- `PUT /exam-plans/active`
+- `PUT /exam-plans/active/scopes`
 
 ## 8. 플랜 생성 API
 
