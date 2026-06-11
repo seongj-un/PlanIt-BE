@@ -24,8 +24,10 @@
 - 인증 API 구현 완료: signup, login, refresh, logout.
 - 온보딩 입력 API 구현 완료: study profile, active exam plan, subject scopes.
 - 플랜 생성 job MVP 구현 완료: 동기 생성 + job 상태 조회 방식.
-- 플랜 도메인 엔티티는 존재함: daily plan, daily plan item, completion event.
-- 오늘 플랜, 대시보드, 기록 API는 아직 미구현.
+- 오늘 플랜 API 구현 완료: 조회, 일괄 수정, 체크/체크 해제, 완료 처리, 진행도 조회.
+- 대시보드 API 구현 완료.
+- 기록 API 구현 완료: 월별 기록, 특정 날짜 상세.
+- 플랜 도메인 엔티티와 집계 이벤트는 현재 API 흐름에 연결됨.
 
 ## Spec Gaps To Resolve
 
@@ -40,11 +42,11 @@
 - 모델 응답 JSON shape.
 - 플랜 생성 job을 실제 비동기로 바꿀 시점과 방식.
 - 완료 체크 해제 시 새싹 회수 정책.
+- 설정 API 범위와 저장 모델.
 
 ## Next Candidate Work
 
-1. `api-spec.md`와 현재 온보딩/plan-generation API 구조를 정리한다.
-2. `GET /plans/today`와 `GET /plans/today/progress`를 만든다.
-3. `PUT /plans/today`, `PATCH /plans/today/items/{planItemId}`, `POST /plans/today/complete`를 만든다.
-4. `GET /dashboard`, `GET /plans/history`, `GET /plans/history/{date}`로 확장한다.
-5. 이후 Anthropic Haiku provider 분리 지점을 설계한다.
+1. `api-spec.md`를 현재 구현 구조에 맞게 정리한다.
+2. `PATCH /users/me/study-settings`와 `PATCH /users/me/notification-settings` 필요 여부를 확정한다.
+3. 플랜 생성 로직에서 Anthropic Haiku provider 분리 지점을 설계한다.
+4. 동기식 `plan-generation-jobs`를 실제 비동기 처리로 전환할 시점을 정한다.
