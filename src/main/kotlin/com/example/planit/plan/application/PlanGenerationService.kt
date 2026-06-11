@@ -16,6 +16,7 @@ import com.example.planit.plan.domain.DailyPlanItem
 import com.example.planit.plan.domain.DailyPlanItemRepository
 import com.example.planit.plan.domain.DailyPlanRepository
 import com.example.planit.plan.domain.DailyPlanStatus
+import com.example.planit.plan.domain.CompletionEventRepository
 import com.example.planit.plan.domain.PlanGenerationJob
 import com.example.planit.plan.domain.PlanGenerationJobRepository
 import com.example.planit.plan.domain.PlanGenerationJobStatus
@@ -37,6 +38,7 @@ class PlanGenerationService(
     private val subjectScopeRepository: SubjectScopeRepository,
     private val dailyPlanRepository: DailyPlanRepository,
     private val dailyPlanItemRepository: DailyPlanItemRepository,
+    private val completionEventRepository: CompletionEventRepository,
     private val planGenerationJobRepository: PlanGenerationJobRepository,
 ) {
 
@@ -98,10 +100,11 @@ class PlanGenerationService(
                     planDate = planDate,
                     status = DailyPlanStatus.PENDING,
                 )
-            }
+        }
         dailyPlan.status = DailyPlanStatus.PENDING
         val savedPlan = dailyPlanRepository.save(dailyPlan)
 
+        completionEventRepository.deleteAllByDailyPlanItemDailyPlanId(savedPlan.id!!)
         dailyPlanItemRepository.deleteAllByDailyPlanId(savedPlan.id!!)
 
         val difficultSubjects = request.difficultSubjects.map { normalize(it) }.toSet()

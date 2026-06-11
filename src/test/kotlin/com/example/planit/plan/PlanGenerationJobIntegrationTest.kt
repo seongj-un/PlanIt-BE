@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
 import java.time.LocalDate
@@ -119,6 +120,63 @@ class PlanGenerationJobIntegrationTest(
         assertThat(responseJson["error"]["code"].asText()).isEqualTo("SUBJECT_SCOPE_NOT_FOUND")
     }
 
+    @Test
+    fun `regenerating today's plan removes stale completion rewards`() {
+        val authToken = signupAndGetAccessToken("regenerate@example.com")
+        upsertStudyProfile(authToken)
+        upsertActivePlan(authToken)
+        replaceSubjectScopes(authToken)
+
+        mockMvc.post("/api/v1/plan-generation-jobs") {
+            header("Authorization", "Bearer $authToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = validGenerationRequest()
+        }.andExpect {
+            status { isAccepted() }
+        }
+
+        val todayPlanResponse = mockMvc.get("/api/v1/plans/today") {
+            header("Authorization", "Bearer $authToken")
+        }.andExpect {
+            status { isOk() }
+        }.andReturn().response.contentAsString
+        val todayPlanJson = objectMapper.readTree(todayPlanResponse)
+        val firstItemId = todayPlanJson["data"]["items"][0]["planItemId"].asLong()
+
+        mockMvc.patch("/api/v1/plans/today/items/$firstItemId") {
+            header("Authorization", "Bearer $authToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"completed":true}"""
+        }.andExpect {
+            status { isOk() }
+        }
+
+        val progressBeforeRegeneration = mockMvc.get("/api/v1/plans/today/progress") {
+            header("Authorization", "Bearer $authToken")
+        }.andExpect {
+            status { isOk() }
+        }.andReturn().response.contentAsString
+        assertThat(objectMapper.readTree(progressBeforeRegeneration)["data"]["sproutCount"].asInt()).isEqualTo(1)
+
+        mockMvc.post("/api/v1/plan-generation-jobs") {
+            header("Authorization", "Bearer $authToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = validGenerationRequest()
+        }.andExpect {
+            status { isAccepted() }
+        }
+
+        val progressAfterRegeneration = mockMvc.get("/api/v1/plans/today/progress") {
+            header("Authorization", "Bearer $authToken")
+        }.andExpect {
+            status { isOk() }
+        }.andReturn().response.contentAsString
+
+        val progressJson = objectMapper.readTree(progressAfterRegeneration)
+        assertThat(progressJson["data"]["completedCount"].asInt()).isZero()
+        assertThat(progressJson["data"]["sproutCount"].asInt()).isZero()
+    }
+
     private fun signupAndGetAccessToken(email: String): String {
         val signupResponse = mockMvc.post("/api/v1/auth/signup") {
             contentType = MediaType.APPLICATION_JSON
@@ -205,4 +263,27 @@ class PlanGenerationJobIntegrationTest(
             status { isOk() }
         }
     }
+
+    private fun validGenerationRequest(): String =
+        """
+        {
+          "subjects": [
+            {
+              "subjectName": "수학",
+              "examRange": "수열과 극한 1~3단원",
+              "preferredMethodNote": "개념 정리 후 대표 문제 15문제",
+              "difficulty": "HIGH"
+            },
+            {
+              "subjectName": "영어",
+              "examRange": "빈칸 추론 10문제",
+              "preferredMethodNote": "근거 문장 표시",
+              "difficulty": "MEDIUM"
+            }
+          ],
+          "preferredStudyMethod": "BALANCED",
+          "difficultSubjects": ["수학"],
+          "dailyMaxStudyHours": 5
+        }
+        """.trimIndent()
 }

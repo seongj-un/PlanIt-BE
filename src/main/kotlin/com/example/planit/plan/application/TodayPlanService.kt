@@ -71,6 +71,7 @@ class TodayPlanService(
         }
 
         request.items.forEach { itemRequest ->
+            validateTodayPlanUpdateItem(itemRequest)
             val existing = itemRequest.planItemId?.let { existingItems[it] }
             if (itemRequest.planItemId != null && existing == null) {
                 throw CommonApiException(HttpStatus.NOT_FOUND, "PLAN_ITEM_NOT_FOUND", "플랜 항목을 찾을 수 없습니다.")
@@ -91,6 +92,18 @@ class TodayPlanService(
         )
     }
 
+    private fun validateTodayPlanUpdateItem(request: TodayPlanUpdateItemRequest) {
+        if (request.subjectName.isBlank()) {
+            throw CommonApiException(HttpStatus.BAD_REQUEST, "SUBJECT_NAME_REQUIRED", "과목명은 비어 있을 수 없습니다.")
+        }
+        if (request.examRange.isBlank()) {
+            throw CommonApiException(HttpStatus.BAD_REQUEST, "EXAM_RANGE_REQUIRED", "시험 범위는 비어 있을 수 없습니다.")
+        }
+        if (request.studyMethod.isBlank()) {
+            throw CommonApiException(HttpStatus.BAD_REQUEST, "STUDY_METHOD_REQUIRED", "공부 방법은 비어 있을 수 없습니다.")
+        }
+    }
+
     @Transactional
     fun toggleTodayPlanItem(
         principal: AuthenticatedUser,
@@ -106,14 +119,16 @@ class TodayPlanService(
         if (item.status != targetStatus) {
             if (item.status == PlanItemStatus.PENDING && targetStatus == PlanItemStatus.COMPLETED) {
                 item.status = PlanItemStatus.COMPLETED
-                completionEventRepository.save(
-                    CompletionEvent(
-                        dailyPlanItem = item,
-                        eventType = CompletionEventType.ITEM_CHECKED,
-                        sproutDelta = 1,
-                    ),
-                )
-                sproutAwarded = 1
+                if (!completionEventRepository.existsByDailyPlanItemId(item.id!!)) {
+                    completionEventRepository.save(
+                        CompletionEvent(
+                            dailyPlanItem = item,
+                            eventType = CompletionEventType.ITEM_CHECKED,
+                            sproutDelta = 1,
+                        ),
+                    )
+                    sproutAwarded = 1
+                }
             } else if (item.status == PlanItemStatus.COMPLETED && targetStatus == PlanItemStatus.PENDING) {
                 item.status = PlanItemStatus.PENDING
                 item.dailyPlan.status = DailyPlanStatus.PENDING

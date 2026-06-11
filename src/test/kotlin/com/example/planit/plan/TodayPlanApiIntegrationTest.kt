@@ -170,6 +170,84 @@ class TodayPlanApiIntegrationTest(
         assertThat(responseJson["error"]["code"].asText()).isEqualTo("PLAN_NOT_FINISHED")
     }
 
+    @Test
+    fun `today plan update rejects blank fields`() {
+        val authToken = createGeneratedTodayPlan("today-plan-invalid-update@example.com")
+
+        val response = mockMvc.put("/api/v1/plans/today") {
+            header("Authorization", "Bearer $authToken")
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "items": [
+                    {
+                      "subjectName": "   ",
+                      "examRange": " ",
+                      "studyMethod": "",
+                      "priority": "HIGH"
+                    }
+                  ],
+                  "deletedPlanItemIds": []
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isBadRequest() }
+        }.andReturn().response.contentAsString
+
+        val responseJson = objectMapper.readTree(response)
+        assertThat(responseJson["error"]["code"].asText()).isEqualTo("SUBJECT_NAME_REQUIRED")
+    }
+
+    @Test
+    fun `rechecking completed item does not mint extra sprouts`() {
+        val authToken = createGeneratedTodayPlan("today-plan-recheck@example.com")
+
+        val todayPlanResponse = mockMvc.get("/api/v1/plans/today") {
+            header("Authorization", "Bearer $authToken")
+        }.andExpect {
+            status { isOk() }
+        }.andReturn().response.contentAsString
+
+        val firstItemId = objectMapper.readTree(todayPlanResponse)["data"]["items"][0]["planItemId"].asLong()
+
+        mockMvc.patch("/api/v1/plans/today/items/$firstItemId") {
+            header("Authorization", "Bearer $authToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"completed":true}"""
+        }.andExpect {
+            status { isOk() }
+        }
+
+        mockMvc.patch("/api/v1/plans/today/items/$firstItemId") {
+            header("Authorization", "Bearer $authToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"completed":false}"""
+        }.andExpect {
+            status { isOk() }
+        }
+
+        val recheckResponse = mockMvc.patch("/api/v1/plans/today/items/$firstItemId") {
+            header("Authorization", "Bearer $authToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"completed":true}"""
+        }.andExpect {
+            status { isOk() }
+        }.andReturn().response.contentAsString
+
+        val recheckJson = objectMapper.readTree(recheckResponse)
+        assertThat(recheckJson["data"]["sproutAwarded"].asInt()).isZero()
+
+        val progressResponse = mockMvc.get("/api/v1/plans/today/progress") {
+            header("Authorization", "Bearer $authToken")
+        }.andExpect {
+            status { isOk() }
+        }.andReturn().response.contentAsString
+
+        val progressJson = objectMapper.readTree(progressResponse)
+        assertThat(progressJson["data"]["sproutCount"].asInt()).isEqualTo(1)
+    }
+
     private fun createGeneratedTodayPlan(email: String): String {
         val authToken = signupAndGetAccessToken(email)
         upsertStudyProfile(authToken)

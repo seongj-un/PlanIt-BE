@@ -66,6 +66,7 @@ class DashboardAndHistoryIntegrationTest(
         assertThat(json["data"]["todayPlan"]["totalCount"].asInt()).isEqualTo(2)
         assertThat(json["data"]["todayPlan"]["progressPercent"].asInt()).isEqualTo(100)
         assertThat(json["data"]["todayPlan"]["items"].size()).isEqualTo(2)
+        assertThat(json["data"]["todayPlan"]["items"][0]["scopeSummary"].asText()).contains("수열과 극한 2단원")
         assertThat(json["data"]["rewards"]["sproutCount"].asInt()).isEqualTo(4)
         assertThat(json["data"]["rewards"]["earnedToday"].asInt()).isEqualTo(2)
         assertThat(json["data"]["attendance"]["streakDays"].asInt()).isEqualTo(2)

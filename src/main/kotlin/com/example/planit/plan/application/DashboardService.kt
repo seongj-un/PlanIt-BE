@@ -59,7 +59,7 @@ class DashboardService(
                     DashboardTodayPlanItemResponse(
                         planItemId = it.planItemId,
                         subjectName = it.subjectName,
-                        scopeSummary = "${it.subjectName}: ${it.studyMethod}",
+                        scopeSummary = "${it.examRange}: ${it.studyMethod}",
                         completed = it.status == PlanItemStatus.COMPLETED.name,
                     )
                 },

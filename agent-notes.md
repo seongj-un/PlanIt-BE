@@ -28,6 +28,7 @@
 - 대시보드 API 구현 완료.
 - 기록 API 구현 완료: 월별 기록, 특정 날짜 상세.
 - 플랜 도메인 엔티티와 집계 이벤트는 현재 API 흐름에 연결됨.
+- 회귀 수정 반영 완료: 플랜 재생성 시 stale completion event 정리, today plan update blank validation, dashboard scopeSummary 정합성, 재체크 보상 중복 지급 방지.
 
 ## Spec Gaps To Resolve
 
