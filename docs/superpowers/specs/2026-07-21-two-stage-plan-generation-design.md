@@ -54,6 +54,7 @@ PlanGenerationJobProcessor
   - 각 날짜 항목에 그 과목의 **누적 유닛 위치**(`startUnit`, `endUnit`, 1-based, 남은 범위 기준)를 기록.
   - 표시용 범위 문자열(`rangeText`)은 `startUnit`~`endUnit` + `unitType` 라벨로 생성. 예) "1~5쪽", "3~4단원".
   - 각 날짜의 총 학습 시간은 `dailyMaxStudyHours × 60`분을 상한으로, 그날 항목들에 유닛 수 비례로 배분(`estimatedMinutes`).
+  - **빈 날짜는 생성하지 않는다.** 항목이 1개 이상인 날짜만 `GeneratedDailyPlan`으로 만든다. `remainingUnits`가 학습 일수보다 작으면 앞쪽 날짜에만 배치되고 그 이후는 빈 날이 되는데, 이런 날은 스케줄에서 제외한다. (예: `examDate`가 수십 년 뒤여도 실제 생성 일수는 `max(remainingUnits)` 수준으로 제한됨 — 대량의 빈 `DailyPlan` 방지)
 - 순수 함수에 가깝게(외부 I/O 없음) 구현해 단위 테스트로 숫자를 전부 검증한다.
 
 ### 4.2 PlanArrangementProvider (2단계)
