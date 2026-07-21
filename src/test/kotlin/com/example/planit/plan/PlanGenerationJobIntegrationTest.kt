@@ -62,6 +62,28 @@ class PlanGenerationJobIntegrationTest(
     }
 
     @Test
+    fun `generates plans across the whole period until the last allocated day`() {
+        val authToken = signupAndGetAccessToken("whole-period@example.com")
+        upsertStudyProfile(authToken)
+        upsertActivePlan(authToken)
+        replaceSubjectScopes(authToken)
+
+        val createResponse = mockMvc.post("/api/v1/plan-generation-jobs") {
+            header("Authorization", "Bearer $authToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = validGenerationRequest()
+        }.andExpect { status { isAccepted() } }.andReturn().response.contentAsString
+        awaitJobCompleted(authToken, objectMapper.readTree(createResponse)["data"]["jobId"].asText())
+
+        // 영어 10문제 → 앞쪽 10일에 1문제씩. 수학 3단원 → 앞쪽 3일. 비어있는 날은 저장 안 됨.
+        val history = mockMvc.get("/api/v1/plans/history/${LocalDate.now().plusDays(9)}") {
+            header("Authorization", "Bearer $authToken")
+        }.andExpect { status { isOk() } }.andReturn().response.contentAsString
+        val items = objectMapper.readTree(history)["data"]["items"]
+        assertThat(items.map { it["subjectName"].asText() }).containsExactly("영어")
+    }
+
+    @Test
     fun `fail plan generation when subject scope is missing`() {
         val authToken = signupAndGetAccessToken("missing-scope@example.com")
         upsertStudyProfile(authToken)

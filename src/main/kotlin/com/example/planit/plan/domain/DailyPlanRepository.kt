@@ -6,6 +6,7 @@ import java.util.Optional
 
 interface DailyPlanRepository : JpaRepository<DailyPlan, Long> {
     fun findByExamPlanIdAndPlanDate(examPlanId: Long, planDate: LocalDate): Optional<DailyPlan>
+    fun findAllByExamPlanIdAndPlanDateGreaterThanEqual(examPlanId: Long, planDate: LocalDate): List<DailyPlan>
     fun findByExamPlanUserIdAndPlanDate(userId: Long, planDate: LocalDate): Optional<DailyPlan>
     fun findAllByExamPlanUserIdAndPlanDateBetweenOrderByPlanDateAsc(
         userId: Long,

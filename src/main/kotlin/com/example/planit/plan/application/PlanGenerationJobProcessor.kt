@@ -1,6 +1,7 @@
 package com.example.planit.plan.application
 
 import com.example.planit.common.api.CommonApiException
+import com.example.planit.exam.domain.ExamPlan
 import com.example.planit.exam.domain.ExamPlanRepository
 import com.example.planit.exam.domain.ExamPlanStatus
 import com.example.planit.exam.domain.SubjectScopeRepository
@@ -13,11 +14,13 @@ import com.example.planit.plan.domain.DailyPlanStatus
 import com.example.planit.plan.domain.PlanGenerationJobRepository
 import com.example.planit.plan.domain.PlanGenerationJobStatus
 import com.example.planit.plan.domain.PlanItemStatus
+import com.example.planit.user.domain.StudyProfileRepository
 import org.springframework.http.HttpStatus
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Component
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
+import java.time.LocalDate
 
 @Component
 class PlanGenerationJobProcessor(
@@ -27,6 +30,7 @@ class PlanGenerationJobProcessor(
     private val dailyPlanItemRepository: DailyPlanItemRepository,
     private val completionEventRepository: CompletionEventRepository,
     private val planGenerationJobRepository: PlanGenerationJobRepository,
+    private val studyProfileRepository: StudyProfileRepository,
     private val planGenerationProvider: PlanGenerationProvider,
     transactionManager: PlatformTransactionManager,
 ) {
@@ -63,61 +67,74 @@ class PlanGenerationJobProcessor(
 
         job.status = PlanGenerationJobStatus.RUNNING
         job.progressPercent = 15
-        job.message = "오늘 플랜을 생성하고 있어요."
+        job.message = "학습 계획을 생성하고 있어요."
 
-        val draft = planGenerationProvider.generate(
+        val studyProfile = studyProfileRepository.findByUserId(userId).orElse(null)
+        val schedule = planGenerationProvider.generate(
             request = request,
             activePlan = activePlan,
             availableScopes = subjectScopeRepository.findAllByExamPlanId(activePlan.id!!),
+            studyProfile = studyProfile,
         )
 
         job.progressPercent = 70
-        job.message = "오늘 플랜을 저장하고 있어요."
+        job.message = "학습 계획을 저장하고 있어요."
 
-        val savedPlan = persistPlan(activePlan.id!!, draft)
+        val todayPlan = persistSchedule(activePlan, schedule)
 
         job.status = PlanGenerationJobStatus.COMPLETED
         job.progressPercent = 100
-        job.message = "오늘 플랜 생성을 완료했어요."
-        job.planDate = draft.planDate
-        job.generatedPlanId = savedPlan.id
+        job.message = "학습 계획 생성을 완료했어요."
+        job.planDate = todayPlan.planDate
+        job.generatedPlanId = todayPlan.id
     }
 
-    private fun persistPlan(examPlanId: Long, draft: GeneratedPlanDraft): DailyPlan {
-        val dailyPlan = dailyPlanRepository.findByExamPlanIdAndPlanDate(examPlanId, draft.planDate)
-            .orElseGet {
-                DailyPlan(
-                    examPlan = draft.items.firstOrNull()?.scope?.examPlan
-                        ?: throw CommonApiException(HttpStatus.CONFLICT, "PLAN_GENERATION_FAILED", "플랜 생성에 필요한 범위를 찾을 수 없습니다."),
-                    planDate = draft.planDate,
-                    status = DailyPlanStatus.PENDING,
+    /** 오늘 이후 기존 계획을 지우고 전체 기간을 새로 저장한 뒤, 오늘(없으면 가장 이른 날) 계획을 반환. */
+    private fun persistSchedule(activePlan: ExamPlan, schedule: PlanSchedule): DailyPlan {
+        if (schedule.days.isEmpty()) {
+            throw CommonApiException(HttpStatus.CONFLICT, "PLAN_GENERATION_FAILED", "생성된 학습 계획이 없습니다.")
+        }
+        val today = LocalDate.now()
+
+        val existing = dailyPlanRepository.findAllByExamPlanIdAndPlanDateGreaterThanEqual(activePlan.id!!, today)
+        existing.forEach { plan ->
+            completionEventRepository.deleteAllByDailyPlanItemDailyPlanId(plan.id!!)
+            dailyPlanItemRepository.deleteAllByDailyPlanId(plan.id!!)
+        }
+        dailyPlanRepository.deleteAll(existing)
+        dailyPlanRepository.flush()
+
+        var todayPlan: DailyPlan? = null
+        var earliestPlan: DailyPlan? = null
+
+        schedule.days.forEach { day ->
+            val savedPlan = dailyPlanRepository.save(
+                DailyPlan(examPlan = activePlan, planDate = day.planDate, status = DailyPlanStatus.PENDING),
+            )
+            day.items.forEach { item ->
+                dailyPlanItemRepository.save(
+                    DailyPlanItem(
+                        dailyPlan = savedPlan,
+                        subjectScope = item.scope,
+                        subjectNameSnapshot = item.subjectName,
+                        rangeTextSnapshot = item.rangeText,
+                        studyMethodSnapshot = item.studyMethod,
+                        priority = item.priority,
+                        status = PlanItemStatus.PENDING,
+                        plannedUnits = item.plannedUnits,
+                        estimatedMinutes = item.estimatedMinutes,
+                        manuallyAdjusted = false,
+                        startUnit = item.startUnit,
+                        endUnit = item.endUnit,
+                        displayOrder = item.displayOrder,
+                    ),
                 )
             }
-
-        dailyPlan.status = DailyPlanStatus.PENDING
-        val savedPlan = dailyPlanRepository.save(dailyPlan)
-
-        completionEventRepository.deleteAllByDailyPlanItemDailyPlanId(savedPlan.id!!)
-        dailyPlanItemRepository.deleteAllByDailyPlanId(savedPlan.id!!)
-
-        draft.items.forEach { item ->
-            dailyPlanItemRepository.save(
-                DailyPlanItem(
-                    dailyPlan = savedPlan,
-                    subjectScope = item.scope,
-                    subjectNameSnapshot = item.subjectName,
-                    rangeTextSnapshot = item.examRange,
-                    studyMethodSnapshot = item.studyMethod,
-                    priority = item.priority,
-                    status = PlanItemStatus.PENDING,
-                    plannedUnits = item.plannedUnits,
-                    estimatedMinutes = item.estimatedMinutes,
-                    manuallyAdjusted = false,
-                ),
-            )
+            if (earliestPlan == null) earliestPlan = savedPlan
+            if (day.planDate == today) todayPlan = savedPlan
         }
 
-        return savedPlan
+        return todayPlan ?: earliestPlan!!
     }
 
     private fun markFailed(jobPrimaryKey: Long, exception: Exception) {
@@ -125,6 +142,6 @@ class PlanGenerationJobProcessor(
             .orElseThrow { CommonApiException(HttpStatus.NOT_FOUND, "JOB_NOT_FOUND", "플랜 생성 작업을 찾을 수 없습니다.") }
         job.status = PlanGenerationJobStatus.FAILED
         job.progressPercent = 100
-        job.message = exception.message?.take(255) ?: "오늘 플랜 생성에 실패했어요."
+        job.message = exception.message?.take(255) ?: "학습 계획 생성에 실패했어요."
     }
 }
