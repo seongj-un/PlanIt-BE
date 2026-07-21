@@ -38,5 +38,11 @@ class DailyPlanItem(
     var estimatedMinutes: Int,
     @Column(nullable = false)
     var manuallyAdjusted: Boolean = false,
+    @Column(nullable = false)
+    var startUnit: Int = 0,
+    @Column(nullable = false)
+    var endUnit: Int = 0,
+    @Column(nullable = false)
+    var displayOrder: Int = 0,
 ) : BaseEntity() {
 }
