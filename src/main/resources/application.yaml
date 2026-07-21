@@ -28,3 +28,7 @@ planit:
     arrangement:
       mode: rule-based
       timeout-seconds: 20
+    gemini:
+      base-url: https://generativelanguage.googleapis.com
+      model: gemini-2.0-flash
+      api-key: ${GEMINI_API_KEY:}

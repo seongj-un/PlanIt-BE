@@ -4,6 +4,7 @@ import com.example.planit.plan.application.AiArrangementProvider
 import com.example.planit.plan.application.AiClient
 import com.example.planit.plan.application.PlanArrangementProvider
 import com.example.planit.plan.application.RuleBasedArrangementProvider
+import com.example.planit.plan.config.GeminiProperties
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.beans.factory.ObjectProvider
 import org.springframework.boot.context.properties.EnableConfigurationProperties
@@ -12,7 +13,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
 
 @Configuration
-@EnableConfigurationProperties(AiArrangementProperties::class)
+@EnableConfigurationProperties(AiArrangementProperties::class, GeminiProperties::class)
 class PlanArrangementConfig {
 
     @Bean
