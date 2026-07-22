@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary
 
 @Configuration
-@EnableConfigurationProperties(AiArrangementProperties::class, GeminiProperties::class)
+@EnableConfigurationProperties(AiArrangementProperties::class, GeminiProperties::class, GroqProperties::class)
 class PlanArrangementConfig {
 
     @Bean

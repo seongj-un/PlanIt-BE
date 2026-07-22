@@ -9,7 +9,7 @@ import org.springframework.web.client.RestClient
 import org.springframework.web.client.body
 
 @Component
-@ConditionalOnProperty(name = ["planit.ai.arrangement.mode"], havingValue = "ai")
+@ConditionalOnProperty(name = ["planit.ai.arrangement.provider"], havingValue = "gemini")
 class GeminiAiClient(
     restClientBuilder: RestClient.Builder,
     private val properties: GeminiProperties,

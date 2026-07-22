@@ -26,8 +26,13 @@ planit:
       refresh-token-expiration-seconds: 1209600
   ai:
     arrangement:
-      mode: rule-based
+      mode: ${PLANIT_AI_ARRANGEMENT_MODE:rule-based}
+      provider: ${PLANIT_AI_ARRANGEMENT_PROVIDER:groq}
       timeout-seconds: 20
+    groq:
+      base-url: https://api.groq.com/openai
+      model: ${PLANIT_AI_GROQ_MODEL:llama-3.3-70b-versatile}
+      api-key: ${GROQ_API_KEY:}
     gemini:
       base-url: https://generativelanguage.googleapis.com
       model: gemini-2.0-flash
