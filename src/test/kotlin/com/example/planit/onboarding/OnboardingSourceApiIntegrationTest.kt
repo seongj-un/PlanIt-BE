@@ -29,8 +29,6 @@ class OnboardingSourceApiIntegrationTest(
             content =
                 """
                 {
-                  "age": 18,
-                  "schoolLevel": "HIGH_SCHOOL",
                   "usualStudyHoursPerDay": 4,
                   "preferredStudyMethod": "BALANCED"
                 }
@@ -45,7 +43,6 @@ class OnboardingSourceApiIntegrationTest(
             status { isOk() }
         }.andReturn().response.contentAsString
         val profileJson = objectMapper.readTree(profilePayload)
-        assertThat(profileJson["data"]["schoolLevel"].asText()).isEqualTo("HIGH_SCHOOL")
         assertThat(profileJson["data"]["sproutCount"].asInt()).isZero()
         assertThat(profileJson["data"]["attendanceStreakDays"].asInt()).isZero()
         assertThat(profileJson["data"]["onboardingCompleted"].asBoolean()).isFalse()

@@ -95,8 +95,6 @@ class AiArrangementProviderTest {
 
     private fun context(): ArrangementContext =
         ArrangementContext(
-            age = 18,
-            schoolLevel = "HIGH_SCHOOL",
             preferredStudyMethod = "BALANCED",
             subjects = listOf(
                 ArrangementSubject("수학", DifficultyLevel.HIGH, isDifficult = true),

@@ -17,11 +17,6 @@ class StudyProfile(
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     var user: UserAccount,
     @Column(nullable = false)
-    var age: Int,
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 30)
-    var schoolLevel: SchoolLevel,
-    @Column(nullable = false)
     var usualStudyHoursPerDay: Int,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)

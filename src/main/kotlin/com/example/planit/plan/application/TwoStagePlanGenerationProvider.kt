@@ -21,15 +21,13 @@ class TwoStagePlanGenerationProvider(
         studyProfile: StudyProfile?,
     ): PlanSchedule {
         val schedule = scheduleCalculator.calculate(request, activePlan, availableScopes)
-        val context = buildContext(request, studyProfile)
+        val context = buildContext(request)
         return arrangementProvider.arrange(schedule, context)
     }
 
-    private fun buildContext(request: PlanGenerationJobCreateRequest, profile: StudyProfile?): ArrangementContext {
+    private fun buildContext(request: PlanGenerationJobCreateRequest): ArrangementContext {
         val difficultSet = request.difficultSubjects.map { normalize(it) }.toSet()
         return ArrangementContext(
-            age = profile?.age,
-            schoolLevel = profile?.schoolLevel?.name,
             preferredStudyMethod = request.preferredStudyMethod,
             subjects = request.subjects.map { subject ->
                 ArrangementSubject(

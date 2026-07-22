@@ -6,8 +6,6 @@ data class UserProfileResponse(
     val id: Long,
     val name: String,
     val email: String,
-    val age: Int?,
-    val schoolLevel: String?,
     val targetExamType: String?,
     val targetExamLabel: String?,
     val examDate: LocalDate?,

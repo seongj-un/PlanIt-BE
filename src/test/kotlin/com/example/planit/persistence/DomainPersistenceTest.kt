@@ -19,7 +19,6 @@ import com.example.planit.plan.domain.DailyPlanStatus
 import com.example.planit.plan.domain.PlanItemPriority
 import com.example.planit.plan.domain.PlanItemStatus
 import com.example.planit.user.domain.PreferredStudyMethod
-import com.example.planit.user.domain.SchoolLevel
 import com.example.planit.user.domain.StudyProfile
 import com.example.planit.user.domain.StudyProfileRepository
 import com.example.planit.user.domain.UserAccount
@@ -55,8 +54,6 @@ class DomainPersistenceTest(
         val profile = studyProfileRepository.save(
             StudyProfile(
                 user = user,
-                age = 18,
-                schoolLevel = SchoolLevel.HIGH_SCHOOL,
                 usualStudyHoursPerDay = 4,
                 preferredStudyMethod = PreferredStudyMethod.BALANCED,
             ),

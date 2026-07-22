@@ -219,8 +219,6 @@ class PlanGenerationJobIntegrationTest(
             content =
                 """
                 {
-                  "age": 18,
-                  "schoolLevel": "HIGH_SCHOOL",
                   "usualStudyHoursPerDay": 4,
                   "preferredStudyMethod": "BALANCED"
                 }

@@ -36,8 +36,6 @@ class RuleBasedArrangementProviderTest {
             ),
         )
         val context = ArrangementContext(
-            age = 18,
-            schoolLevel = "HIGH_SCHOOL",
             preferredStudyMethod = "BALANCED",
             subjects = listOf(
                 ArrangementSubject("영어", DifficultyLevel.MEDIUM, isDifficult = false),
@@ -59,8 +57,8 @@ class RuleBasedArrangementProviderTest {
         val original = item("수학", PlanItemPriority.LOW, order = 0, units = 5, minutes = 120, start = 1, end = 5)
         val schedule = PlanSchedule(days = listOf(PlanScheduleDay(LocalDate.now(), listOf(original))))
         val context = ArrangementContext(
-            null, null, "BALANCED",
-            listOf(ArrangementSubject("수학", DifficultyLevel.HIGH, isDifficult = false)),
+            preferredStudyMethod = "BALANCED",
+            subjects = listOf(ArrangementSubject("수학", DifficultyLevel.HIGH, isDifficult = false)),
         )
 
         val result = provider.arrange(schedule, context).days.single().items.single()

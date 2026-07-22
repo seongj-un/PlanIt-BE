@@ -65,8 +65,6 @@ class AiArrangementProvider(
     private fun buildPrompt(schedule: PlanSchedule, context: ArrangementContext): String {
         val input = objectMapper.createObjectNode().apply {
             putObject("student").apply {
-                context.age?.let { put("age", it) }
-                context.schoolLevel?.let { put("schoolLevel", it) }
                 put("preferredMethod", context.preferredStudyMethod)
             }
             putArray("subjects").apply {

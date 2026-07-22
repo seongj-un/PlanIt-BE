@@ -34,8 +34,6 @@ data class ArrangementSubject(
 )
 
 data class ArrangementContext(
-    val age: Int?,
-    val schoolLevel: String?,
     val preferredStudyMethod: String,
     val subjects: List<ArrangementSubject>,
 )
