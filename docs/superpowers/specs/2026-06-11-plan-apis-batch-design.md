@@ -3,7 +3,7 @@
 **Goal:** plan generation 이후 남은 핵심 조회/수정 API를 한 번에 구현해 사용자 플로우를 닫는다.
 
 ## Scope
-
+    
 - `GET /api/v1/plans/today`
 - `PUT /api/v1/plans/today`
 - `PATCH /api/v1/plans/today/items/{planItemId}`

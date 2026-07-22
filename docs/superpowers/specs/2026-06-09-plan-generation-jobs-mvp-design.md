@@ -1,4 +1,4 @@
-# Plan Generation Jobs MVP Design
+co# Plan Generation Jobs MVP Design
 
 **Goal:** 온보딩 이후 오늘 플랜을 생성할 수 있는 `plan-generation-jobs` API를 추가한다.
 

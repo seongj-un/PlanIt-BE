@@ -1440,5 +1440,13 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ---
 
+## Addendum (2026-07-21): Gemini AiClient 연결됨
+
+무료 모델 = Google Gemini 확정. 커밋 `0abf909`:
+- `plan/application/GeminiAiClient.kt` — Spring `RestClient`, `x-goog-api-key` 헤더 인증, `candidates[0].content.parts[0].text` 추출. `@ConditionalOnProperty(planit.ai.arrangement.mode=ai)`.
+- `plan/config/GeminiProperties.kt` — `planit.ai.gemini` (base-url / model 기본 `gemini-2.0-flash` / api-key=`${GEMINI_API_KEY:}`).
+- `GeminiAiClientTest.kt` — `MockRestServiceServer`로 헤더·파싱 검증.
+- 켜기: `GEMINI_API_KEY` env + `mode=ai`. 미검증: 실제 Gemini API 라이브 호출(현재 mock만).
+
 ## Execution Handoff
 ```
