@@ -1,5 +1,6 @@
 package com.example.planit.plan.api
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.LocalDate
 
 data class DashboardResponse(
@@ -13,6 +14,8 @@ data class DashboardResponse(
 data class DashboardNextExamResponse(
     val label: String,
     val date: LocalDate,
+    // Force the JSON key to "dDay" (api-spec); Jackson would otherwise emit "dday".
+    @get:JsonProperty("dDay")
     val dDay: Long,
 )
 
