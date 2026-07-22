@@ -39,27 +39,45 @@ class ActiveExamPlanService(
     @Transactional
     fun upsertActivePlan(principal: AuthenticatedUser, request: ActiveExamPlanRequest): ActiveExamPlanResponse {
         require(request.targetExamLabel.isNotBlank()) { "시험 이름은 비어 있을 수 없습니다." }
-        require(!request.examDate.isBefore(LocalDate.now())) { "시험 날짜는 오늘 이후여야 합니다." }
+        val today = LocalDate.now()
+        require(!request.examDate.isBefore(today)) { "시험 날짜는 오늘 이후여야 합니다." }
 
         val user = userAccountRepository.findById(principal.id)
             .orElseThrow { CommonApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "사용자를 찾을 수 없습니다.") }
         val examType = enumValueOf<TargetExamType>(request.targetExamType)
 
-        val plan = examPlanRepository.findByUserIdAndStatus(user.id!!, ExamPlanStatus.ACTIVE)
-            .orElseGet {
-                ExamPlan(
-                    user = user,
-                    targetExamType = examType,
-                    targetExamLabel = request.targetExamLabel.trim(),
-                    examDate = request.examDate,
-                    status = ExamPlanStatus.ACTIVE,
-                )
-            }
+        val activePlan = examPlanRepository.findByUserIdAndStatus(user.id!!, ExamPlanStatus.ACTIVE).orElse(null)
+        val plan = if (activePlan != null && activePlan.examDate.isBefore(today)) {
+            activePlan.status = ExamPlanStatus.COMPLETED
+            examPlanRepository.save(activePlan)
+            ExamPlan(
+                user = user,
+                targetExamType = examType,
+                targetExamLabel = request.targetExamLabel.trim(),
+                examDate = request.examDate,
+                status = ExamPlanStatus.ACTIVE,
+            )
+        } else {
+            activePlan ?: ExamPlan(
+                user = user,
+                targetExamType = examType,
+                targetExamLabel = request.targetExamLabel.trim(),
+                examDate = request.examDate,
+                status = ExamPlanStatus.ACTIVE,
+            )
+        }
 
         plan.targetExamType = examType
         plan.targetExamLabel = request.targetExamLabel.trim()
         plan.examDate = request.examDate
 
+        return examPlanRepository.save(plan).toResponse()
+    }
+
+    @Transactional
+    fun completeActivePlan(principal: AuthenticatedUser): ActiveExamPlanResponse {
+        val plan = activePlan(principal)
+        plan.status = ExamPlanStatus.COMPLETED
         return examPlanRepository.save(plan).toResponse()
     }
 

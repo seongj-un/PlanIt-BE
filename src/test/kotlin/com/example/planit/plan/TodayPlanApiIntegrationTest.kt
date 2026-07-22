@@ -1,5 +1,6 @@
 package com.example.planit.plan
 
+import com.example.planit.exam.domain.ExamPlanRepository
 import com.example.planit.plan.domain.DailyPlanItemRepository
 import com.example.planit.plan.domain.DailyPlanRepository
 import com.fasterxml.jackson.databind.JsonNode
@@ -24,6 +25,7 @@ class TodayPlanApiIntegrationTest(
     @Autowired private val objectMapper: ObjectMapper,
     @Autowired private val dailyPlanRepository: DailyPlanRepository,
     @Autowired private val dailyPlanItemRepository: DailyPlanItemRepository,
+    @Autowired private val examPlanRepository: ExamPlanRepository,
 ) {
 
     @Test
@@ -248,6 +250,110 @@ class TodayPlanApiIntegrationTest(
         assertThat(progressJson["data"]["sproutCount"].asInt()).isEqualTo(1)
     }
 
+    @Test
+    fun `completing a plan item consumes scope units and unchecking restores them`() {
+        val authToken = createGeneratedTodayPlan("scope-progress@example.com")
+
+        val todayPlanResponse = mockMvc.get("/api/v1/plans/today") {
+            header("Authorization", "Bearer $authToken")
+        }.andExpect {
+            status { isOk() }
+        }.andReturn().response.contentAsString
+
+        val mathItem = objectMapper.readTree(todayPlanResponse)["data"]["items"]
+            .first { it["subjectName"].asText() == "수학" }
+        val planItemId = mathItem["planItemId"].asLong()
+        val plannedUnits = dailyPlanItemRepository.findById(planItemId).orElseThrow().plannedUnits
+        val initialScope = getActiveScopes(authToken).first { it["subjectName"].asText() == "수학" }
+        val initialRemainingUnits = initialScope["remainingUnits"].asInt()
+
+        mockMvc.patch("/api/v1/plans/today/items/$planItemId") {
+            header("Authorization", "Bearer $authToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"completed":true}"""
+        }.andExpect {
+            status { isOk() }
+        }
+
+        val consumedScope = getActiveScopes(authToken).first { it["subjectName"].asText() == "수학" }
+        assertThat(consumedScope["remainingUnits"].asInt())
+            .isEqualTo((initialRemainingUnits - plannedUnits).coerceAtLeast(0))
+
+        mockMvc.patch("/api/v1/plans/today/items/$planItemId") {
+            header("Authorization", "Bearer $authToken")
+            contentType = MediaType.APPLICATION_JSON
+            content = """{"completed":false}"""
+        }.andExpect {
+            status { isOk() }
+        }
+
+        val restoredScope = getActiveScopes(authToken).first { it["subjectName"].asText() == "수학" }
+        assertThat(restoredScope["remainingUnits"].asInt()).isEqualTo(initialRemainingUnits)
+    }
+
+    @Test
+    fun `completing an active exam plan removes it from active plan lookup`() {
+        val authToken = signupAndGetAccessToken("complete-exam-plan@example.com")
+        upsertStudyProfile(authToken)
+        upsertActivePlan(authToken)
+        replaceSubjectScopes(authToken)
+
+        val completeResponse = mockMvc.post("/api/v1/exam-plans/active/complete") {
+            header("Authorization", "Bearer $authToken")
+        }.andExpect {
+            status { isOk() }
+        }.andReturn().response.contentAsString
+
+        val completeJson = objectMapper.readTree(completeResponse)
+        assertThat(completeJson["data"]["status"].asText()).isEqualTo("COMPLETED")
+
+        val activePlanResponse = mockMvc.get("/api/v1/exam-plans/active") {
+            header("Authorization", "Bearer $authToken")
+        }.andExpect {
+            status { isNotFound() }
+        }.andReturn().response.contentAsString
+
+        assertThat(objectMapper.readTree(activePlanResponse)["error"]["code"].asText()).isEqualTo("PLAN_NOT_FOUND")
+    }
+
+    @Test
+    fun `upserting archives a past due active plan and creates a new plan`() {
+        val authToken = signupAndGetAccessToken("past-due-exam-plan@example.com")
+        upsertStudyProfile(authToken)
+        upsertActivePlan(authToken)
+        replaceSubjectScopes(authToken)
+
+        val oldPlanResponse = mockMvc.get("/api/v1/exam-plans/active") {
+            header("Authorization", "Bearer $authToken")
+        }.andExpect {
+            status { isOk() }
+        }.andReturn().response.contentAsString
+        val oldPlanId = objectMapper.readTree(oldPlanResponse)["data"]["id"].asLong()
+        val oldPlan = examPlanRepository.findById(oldPlanId).orElseThrow()
+        oldPlan.examDate = LocalDate.now().minusDays(1)
+        examPlanRepository.save(oldPlan)
+
+        val newPlanResponse = mockMvc.put("/api/v1/exam-plans/active") {
+            header("Authorization", "Bearer $authToken")
+            contentType = MediaType.APPLICATION_JSON
+            content =
+                """
+                {
+                  "targetExamType": "SCHOOL_EXAM",
+                  "targetExamLabel": "다음 중간고사",
+                  "examDate": "${LocalDate.now().plusDays(60)}"
+                }
+                """.trimIndent()
+        }.andExpect {
+            status { isOk() }
+        }.andReturn().response.contentAsString
+
+        val newPlanJson = objectMapper.readTree(newPlanResponse)["data"]
+        assertThat(newPlanJson["id"].asLong()).isNotEqualTo(oldPlanId)
+        assertThat(newPlanJson["status"].asText()).isEqualTo("ACTIVE")
+        assertThat(examPlanRepository.findById(oldPlanId).orElseThrow().status.name).isEqualTo("COMPLETED")
+    }
+
     private fun createGeneratedTodayPlan(email: String): String {
         val authToken = signupAndGetAccessToken(email)
         upsertStudyProfile(authToken)
@@ -375,6 +481,16 @@ class TodayPlanApiIntegrationTest(
         }.andReturn().response.contentAsString
 
         awaitJobCompleted(authToken, objectMapper.readTree(createResponse)["data"]["jobId"].asText())
+    }
+
+    private fun getActiveScopes(authToken: String): JsonNode {
+        val response = mockMvc.get("/api/v1/exam-plans/active/scopes") {
+            header("Authorization", "Bearer $authToken")
+        }.andExpect {
+            status { isOk() }
+        }.andReturn().response.contentAsString
+
+        return objectMapper.readTree(response)["data"]
     }
 
     private fun awaitJobCompleted(authToken: String, jobId: String) {

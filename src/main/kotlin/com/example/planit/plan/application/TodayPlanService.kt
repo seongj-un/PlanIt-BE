@@ -120,6 +120,7 @@ class TodayPlanService(
         if (item.status != targetStatus) {
             if (item.status == PlanItemStatus.PENDING && targetStatus == PlanItemStatus.COMPLETED) {
                 item.status = PlanItemStatus.COMPLETED
+                consumeScopeUnits(item)
                 if (currentSproutBalance <= 0) {
                     completionEventRepository.save(
                         CompletionEvent(
@@ -132,6 +133,7 @@ class TodayPlanService(
                 }
             } else if (item.status == PlanItemStatus.COMPLETED && targetStatus == PlanItemStatus.PENDING) {
                 item.status = PlanItemStatus.PENDING
+                restoreScopeUnits(item)
                 item.dailyPlan.status = DailyPlanStatus.PENDING
                 if (currentSproutBalance > 0) {
                     completionEventRepository.save(
@@ -212,6 +214,16 @@ class TodayPlanService(
     private fun todayPlan(userId: Long): DailyPlan =
         dailyPlanRepository.findByExamPlanUserIdAndPlanDate(userId, LocalDate.now())
             .orElseThrow { CommonApiException(HttpStatus.NOT_FOUND, "PLAN_NOT_FOUND", "오늘 플랜이 없습니다.") }
+
+    private fun consumeScopeUnits(item: DailyPlanItem) {
+        val scope = item.subjectScope
+        scope.remainingUnits = (scope.remainingUnits - item.plannedUnits).coerceAtLeast(0)
+    }
+
+    private fun restoreScopeUnits(item: DailyPlanItem) {
+        val scope = item.subjectScope
+        scope.remainingUnits = (scope.remainingUnits + item.plannedUnits).coerceAtMost(scope.totalUnits)
+    }
 
     private fun updateExistingItem(item: DailyPlanItem, request: TodayPlanUpdateItemRequest) {
         item.subjectNameSnapshot = request.subjectName.trim()

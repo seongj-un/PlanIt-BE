@@ -5,6 +5,7 @@ import com.example.planit.auth.security.AuthenticatedUser
 import com.example.planit.exam.application.ActiveExamPlanService
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -28,6 +29,12 @@ class ActiveExamPlanController(
         @RequestBody request: ActiveExamPlanRequest,
     ): ApiSuccessResponse<ActiveExamPlanResponse> =
         ApiSuccessResponse(data = activeExamPlanService.upsertActivePlan(principal, request))
+
+    @PostMapping("/complete")
+    fun completeActivePlan(
+        @AuthenticationPrincipal principal: AuthenticatedUser,
+    ): ApiSuccessResponse<ActiveExamPlanResponse> =
+        ApiSuccessResponse(data = activeExamPlanService.completeActivePlan(principal))
 
     @GetMapping("/scopes")
     fun getActiveScopes(
