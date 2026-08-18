@@ -1,0 +1,22 @@
+# 로컬 개발용 PostgreSQL. `docker compose up -d` 로 띄운다.
+# 앱은 기본값(localhost:5432 / planit / planit)으로 자동 접속한다.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: planit-postgres
+    environment:
+      POSTGRES_DB: planit
+      POSTGRES_USER: planit
+      POSTGRES_PASSWORD: planit
+    ports:
+      - "5432:5432"
+    volumes:
+      - planit-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U planit -d planit"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  planit-postgres-data:

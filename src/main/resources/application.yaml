@@ -2,20 +2,17 @@ spring:
   application:
     name: PlanIt
   datasource:
-    url: jdbc:h2:mem:planit;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/planit}
+    username: ${DB_USERNAME:planit}
+    password: ${DB_PASSWORD:planit}
+    driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: ${JPA_DDL_AUTO:update}
     open-in-view: false
     properties:
       hibernate:
         format_sql: true
-  h2:
-    console:
-      enabled: true
 
 planit:
   security:

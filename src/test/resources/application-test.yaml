@@ -1,0 +1,11 @@
+# 테스트 전용 override — application.yaml(운영: PostgreSQL) 위에 병합되어
+# datasource 만 H2 인메모리로 바꾼다. 테스트는 Postgres 없이 돌아간다.
+spring:
+  datasource:
+    url: jdbc:h2:mem:planit;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
