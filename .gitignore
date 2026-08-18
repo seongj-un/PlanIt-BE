@@ -42,3 +42,7 @@ out/
 ### Local secrets (never commit / never package) ###
 .env
 **/.env
+
+# agent/session tooling
+.claude/
+codex-context.md
